@@ -10,7 +10,7 @@ const Index = () => {
       </main>
       <footer className="border-t border-border py-8 mt-16">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>Sentiment Analysis Tool • Powered by Advanced AI Technology</p>
+          <p>Sentiment Analysis Tool • Made by Diksha</p>
         </div>
       </footer>
     </div>
