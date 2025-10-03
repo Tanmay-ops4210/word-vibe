@@ -34,23 +34,25 @@ Preferred communication style: Simple, everyday language.
 
 ### Backend Architecture
 
-**Edge Functions**: Serverless functions deployed on Supabase Edge Functions (Deno runtime).
+**Local Express Server**: Node.js Express backend server (port 3000) that replaces Supabase Edge Functions for local development.
 
-**Sentiment Analysis Function** (`analyze-sentiment`):
+**Sentiment Analysis Endpoint** (`/api/analyze-sentiment`):
 - Processes text input and returns sentiment classification
-- Uses Hugging Face Inference API with DistilBERT model
+- Uses Hugging Face Inference API with DistilBERT model (`distilbert-base-uncased-finetuned-sst-2-english`)
 - Handles rate limiting and model loading states
 - Returns sentiment (positive/negative/neutral), confidence score, and explanation
 
-**Image Analysis Function** (`analyze-image`):
+**Image Analysis Endpoint** (`/api/analyze-image`):
 - Processes image uploads and extracts text/captions
-- Uses Hugging Face Vision-GPT2 model for image captioning
+- Uses Hugging Face Vision-GPT2 model for image captioning (`nlpconnect/vit-gpt2-image-captioning`)
 - Handles base64 image encoding/decoding
 - Includes retry logic for model loading delays
 
 **Error Handling**: Comprehensive error handling with user-friendly messages, including specific handling for API rate limits (429) and service unavailability (503).
 
-**CORS Configuration**: All edge functions include proper CORS headers for cross-origin requests.
+**CORS Configuration**: All API endpoints include proper CORS headers for cross-origin requests.
+
+**Vite Proxy**: Frontend Vite server (port 5000) proxies all `/api/*` requests to the backend server (port 3000) for seamless development experience.
 
 ### Design Patterns
 
