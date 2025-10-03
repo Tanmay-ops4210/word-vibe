@@ -16,7 +16,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { imageBase64 } = await req.json();
-    
+
     if (!imageBase64) {
       return new Response(
         JSON.stringify({ error: 'Image data is required' }),
@@ -24,48 +24,30 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
-    }
+    console.log('Analyzing image...');
 
-    console.log('Analyzing image for text and sentiment...');
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://api-inference.huggingface.co/models/nlpconnect/vit-gpt2-image-captioning', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/octet-stream',
       },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert at extracting text from images and analyzing sentiment. Extract all visible text from the image and analyze its overall sentiment.'
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Please extract all text visible in this image and analyze the overall sentiment. If there is no text, analyze the emotional tone conveyed by the image itself.'
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: imageBase64
-                }
-              }
-            ]
-          }
-        ],
-      }),
+      body: imageBuffer,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI API error:', response.status, errorText);
+      console.error('Hugging Face API error:', response.status, errorText);
+
+      if (response.status === 429 || response.status === 503) {
+        return new Response(
+          JSON.stringify({ error: 'Service temporarily unavailable. Please try again in a moment.' }),
+          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       return new Response(
         JSON.stringify({ error: 'Failed to analyze image' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -73,9 +55,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const data = await response.json();
-    const extractedText = data.choices[0].message.content;
+    console.log('Hugging Face Image Response:', data);
 
-    console.log('Successfully extracted text from image');
+    const extractedText = data[0]?.generated_text || 'Unable to extract meaningful content from the image.';
+
+    console.log('Successfully analyzed image');
 
     return new Response(
       JSON.stringify({ extractedText }),

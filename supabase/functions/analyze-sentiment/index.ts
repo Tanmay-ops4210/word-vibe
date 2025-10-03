@@ -16,7 +16,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { text } = await req.json();
-    
+
     if (!text || !text.trim()) {
       return new Response(
         JSON.stringify({ error: 'Text is required for analysis' }),
@@ -24,45 +24,27 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
-    }
-
     console.log('Analyzing sentiment for text of length:', text.length);
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert sentiment analysis system. Analyze the sentiment of the given text and respond ONLY with a JSON object in this exact format: {"sentiment": "positive|negative|neutral", "confidence": 0.0-1.0, "explanation": "brief explanation"}. Do not include any other text or formatting.'
-          },
-          {
-            role: 'user',
-            content: `Analyze the sentiment of this text: "${text}"`
-          }
-        ],
-      }),
+      body: JSON.stringify({ inputs: text }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI API error:', response.status, errorText);
-      
-      if (response.status === 429) {
+      console.error('Hugging Face API error:', response.status, errorText);
+
+      if (response.status === 429 || response.status === 503) {
         return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: 'Service temporarily unavailable. Please try again in a moment.' }),
+          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      
+
       return new Response(
         JSON.stringify({ error: 'Failed to analyze sentiment' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -70,30 +52,34 @@ Deno.serve(async (req: Request) => {
     }
 
     const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
+    console.log('Hugging Face Response:', data);
 
-    console.log('AI Response:', aiResponse);
+    const results = data[0];
+    const positiveResult = results.find((r: any) => r.label === 'POSITIVE');
+    const negativeResult = results.find((r: any) => r.label === 'NEGATIVE');
 
-    // Extract JSON from response
-    let analysis;
-    try {
-      // Try to parse as JSON directly
-      analysis = JSON.parse(aiResponse);
-    } catch (e) {
-      // If that fails, try to extract JSON from markdown code blocks
-      const jsonMatch = aiResponse.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-      if (jsonMatch) {
-        analysis = JSON.parse(jsonMatch[1]);
-      } else {
-        // Last resort: try to find JSON object in the text
-        const jsonObjectMatch = aiResponse.match(/\{[\s\S]*?"sentiment"[\s\S]*?\}/);
-        if (jsonObjectMatch) {
-          analysis = JSON.parse(jsonObjectMatch[0]);
-        } else {
-          throw new Error('Could not parse sentiment analysis response');
-        }
-      }
+    const positiveScore = positiveResult?.score || 0;
+    const negativeScore = negativeResult?.score || 0;
+
+    let sentiment: string;
+    let confidence: number;
+
+    if (Math.abs(positiveScore - negativeScore) < 0.2) {
+      sentiment = 'neutral';
+      confidence = 1 - Math.abs(positiveScore - negativeScore);
+    } else if (positiveScore > negativeScore) {
+      sentiment = 'positive';
+      confidence = positiveScore;
+    } else {
+      sentiment = 'negative';
+      confidence = negativeScore;
     }
+
+    const analysis = {
+      sentiment,
+      confidence: Math.round(confidence * 100) / 100,
+      explanation: `The text expresses a ${sentiment} sentiment with ${Math.round(confidence * 100)}% confidence.`
+    };
 
     console.log('Successfully analyzed sentiment:', analysis);
 
