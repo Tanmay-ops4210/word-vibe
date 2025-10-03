@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,7 +25,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log('Analyzing sentiment for text of length:', text.length);
+    console.log('Analyzing sentiment for text:', text.substring(0, 50) + '...');
 
     const response = await fetch('https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english', {
       method: 'POST',
@@ -40,7 +41,7 @@ Deno.serve(async (req: Request) => {
 
       if (response.status === 429 || response.status === 503) {
         return new Response(
-          JSON.stringify({ error: 'Service temporarily unavailable. Please try again in a moment.' }),
+          JSON.stringify({ error: 'AI model is loading. Please try again in a moment.' }),
           { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -52,7 +53,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const data = await response.json();
-    console.log('Hugging Face Response:', data);
+    console.log('Hugging Face Response:', JSON.stringify(data));
 
     const results = data[0];
     const positiveResult = results.find((r: any) => r.label === 'POSITIVE');
@@ -82,6 +83,26 @@ Deno.serve(async (req: Request) => {
     };
 
     console.log('Successfully analyzed sentiment:', analysis);
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const { error: dbError } = await supabase
+      .from('sentiment_analyses')
+      .insert({
+        input_text: text,
+        input_type: 'text',
+        sentiment: analysis.sentiment,
+        confidence: analysis.confidence,
+        explanation: analysis.explanation,
+      });
+
+    if (dbError) {
+      console.error('Database error:', dbError);
+    } else {
+      console.log('Successfully saved analysis to database');
+    }
 
     return new Response(
       JSON.stringify(analysis),
