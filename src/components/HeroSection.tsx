@@ -12,7 +12,7 @@ const HeroSection = () => {
           Sentiment Analysis Tool
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-          Discover the emotional tone of any text instantly. Analyze reviews, feedback, social media posts, and more with advanced AI technology.
+          Discover the emotional tone of any content instantly. Analyze reviews, feedback, social media posts, and more from text, images, PDFs, and documents with advanced AI technology.
         </p>
         <div className="flex flex-wrap justify-center gap-8 pt-4">
           <div className="text-center">
