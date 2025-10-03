@@ -99,12 +99,11 @@ const FileUpload = ({ onFileProcessed }: FileUploadProps) => {
           toast.info("Analyzing image with AI...");
           
           const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-image`,
+            '/api/analyze-image',
             {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
               },
               body: JSON.stringify({ imageBase64 }),
             }

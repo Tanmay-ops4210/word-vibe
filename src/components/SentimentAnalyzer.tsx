@@ -28,7 +28,7 @@ const SentimentAnalyzer = () => {
 
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-sentiment`,
+        '/api/analyze-sentiment',
         {
           method: 'POST',
           headers: {
