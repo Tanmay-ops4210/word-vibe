@@ -1,13 +1,9 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { createClient } from '@supabase/supabase-js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const app = express();
 const PORT = 3000;
@@ -85,22 +81,6 @@ app.post('/api/analyze-sentiment', async (req, res) => {
     };
 
     console.log('Successfully analyzed sentiment:', analysis);
-
-    const { error: dbError } = await supabase
-      .from('sentiment_analyses')
-      .insert({
-        input_text: text,
-        input_type: 'text',
-        sentiment: analysis.sentiment,
-        confidence: analysis.confidence,
-        explanation: analysis.explanation,
-      });
-
-    if (dbError) {
-      console.error('Database error:', dbError);
-    } else {
-      console.log('Successfully saved analysis to database');
-    }
 
     res.json(analysis);
 
