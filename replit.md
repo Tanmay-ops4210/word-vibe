@@ -34,12 +34,28 @@ Preferred communication style: Simple, everyday language.
 
 ### Backend Architecture
 
-**Local Express Server**: Node.js Express backend server (port 3000) that replaces Supabase Edge Functions for local development.
+**Local Express Server**: Node.js Express backend server (port 3000) running on `server.js`.
+
+**Database**: PostgreSQL database (Neon) with Drizzle ORM for data persistence:
+- Connection pooling via `@neondatabase/serverless`
+- Schema defined in `shared/schema.js`
+- Database configuration in `server/db.js`
+- Migrations handled via `drizzle-kit push`
+
+**Data Model**: `sentiment_analyses` table storing:
+- Unique ID (UUID)
+- Input text and type (text/image/pdf/document)
+- Sentiment classification (positive/negative/neutral)
+- Confidence score (numeric)
+- AI-generated explanation
+- Optional filename and IP address
+- Created timestamp
 
 **Sentiment Analysis Endpoint** (`/api/analyze-sentiment`):
 - Processes text input and returns sentiment classification
 - Uses Hugging Face Inference API with DistilBERT model (`distilbert-base-uncased-finetuned-sst-2-english`)
 - Handles rate limiting and model loading states
+- Persists results to PostgreSQL database
 - Returns sentiment (positive/negative/neutral), confidence score, and explanation
 
 **Image Analysis Endpoint** (`/api/analyze-image`):
@@ -48,7 +64,7 @@ Preferred communication style: Simple, everyday language.
 - Handles base64 image encoding/decoding
 - Includes retry logic for model loading delays
 
-**Error Handling**: Comprehensive error handling with user-friendly messages, including specific handling for API rate limits (429) and service unavailability (503).
+**Error Handling**: Comprehensive error handling with user-friendly messages, including specific handling for API rate limits (429) and service unavailability (503). Database errors properly propagate to clients.
 
 **CORS Configuration**: All API endpoints include proper CORS headers for cross-origin requests.
 
@@ -70,11 +86,11 @@ Preferred communication style: Simple, everyday language.
 
 ### Third-Party Services
 
-**Supabase**: Backend-as-a-Service platform providing:
-- Edge Functions hosting (Deno runtime)
-- Client SDK for API communication
-- Authentication infrastructure (configured but not actively used)
-- Environment configuration management
+**Neon PostgreSQL**: Serverless PostgreSQL database providing:
+- Fully managed PostgreSQL database
+- Connection pooling via `@neondatabase/serverless`
+- WebSocket-based connections for serverless environments
+- Integrated with Replit's database management
 
 **Hugging Face Inference API**: AI/ML service providing:
 - Sentiment analysis model: `distilbert-base-uncased-finetuned-sst-2-english`
@@ -116,3 +132,29 @@ Preferred communication style: Simple, everyday language.
 - `next-themes`: Theme management (light/dark mode support)
 - `sonner`: Toast notification system
 - `vaul`: Drawer component library
+- `drizzle-orm`: TypeScript ORM for PostgreSQL
+- `drizzle-kit`: CLI tool for schema migrations
+- `ws`: WebSocket library for Neon serverless connections
+
+## Recent Changes (October 2025)
+
+### Migration from Supabase to Neon PostgreSQL
+
+**Date**: October 5, 2025
+
+**Changes Made**:
+1. Replaced Supabase with Neon PostgreSQL and Drizzle ORM
+2. Migrated database schema from Supabase migrations to Drizzle schema
+3. Converted Supabase Edge Functions to Express.js endpoints in `server.js`
+4. Added database persistence for sentiment analysis results
+5. Removed all Supabase dependencies and configuration files
+6. Implemented proper error propagation for database operations
+
+**New Database Setup**:
+- Database schema: `shared/schema.js`
+- Database connection: `server/db.js`
+- Configuration: `drizzle.config.ts`
+- Commands: `npm run db:push` (deploy schema), `npm run db:studio` (view data)
+
+**Environment Variables**:
+- `DATABASE_URL`: PostgreSQL connection string (automatically configured by Replit)
