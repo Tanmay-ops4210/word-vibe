@@ -1,6 +1,8 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { db } from './server/db.js';
+import { sentimentAnalyses } from './shared/schema.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -81,6 +83,19 @@ app.post('/api/analyze-sentiment', async (req, res) => {
     };
 
     console.log('Successfully analyzed sentiment:', analysis);
+
+    try {
+      await db.insert(sentimentAnalyses).values({
+        inputText: text,
+        inputType: 'text',
+        sentiment: analysis.sentiment,
+        confidence: analysis.confidence.toString(),
+        explanation: analysis.explanation,
+      });
+      console.log('Successfully saved analysis to database');
+    } catch (dbError) {
+      console.error('Database error:', dbError);
+    }
 
     res.json(analysis);
 
