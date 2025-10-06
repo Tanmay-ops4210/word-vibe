@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react';
 import { File, Calendar, HardDrive } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { supabase, type Upload } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+
+type Upload = {
+  id: string;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  upload_date: string;
+  created_at: string;
+};
 
 export default function UploadList() {
   const [uploads, setUploads] = useState<Upload[]>([]);
@@ -15,13 +23,13 @@ export default function UploadList() {
 
   const fetchUploads = async () => {
     try {
-      const { data, error } = await supabase
-        .from('uploads')
-        .select('*')
-        .order('upload_date', { ascending: false });
+      const response = await fetch('http://localhost:3000/api/uploads');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch uploads');
+      }
 
-      if (error) throw error;
-
+      const data = await response.json();
       setUploads(data || []);
     } catch (error) {
       toast({

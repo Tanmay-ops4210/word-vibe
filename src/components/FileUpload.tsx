@@ -3,7 +3,6 @@ import { Upload as UploadIcon, File, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
 
 export default function FileUpload() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -30,13 +29,22 @@ export default function FileUpload() {
     setUploading(true);
 
     try {
-      const { error } = await supabase.from('uploads').insert({
-        file_name: selectedFile.name,
-        file_size: selectedFile.size,
-        file_type: selectedFile.type,
+      const response = await fetch('http://localhost:3000/api/uploads', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          file_name: selectedFile.name,
+          file_size: selectedFile.size,
+          file_type: selectedFile.type,
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
 
       toast({
         title: 'Upload successful',
