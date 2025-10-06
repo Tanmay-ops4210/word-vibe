@@ -24,7 +24,7 @@ const Index = () => {
 
       <footer className="border-t border-border py-8 mt-16">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>File Upload System</p>
+          <p>File Upload System • Built with Supabase</p>
         </div>
       </footer>
     </div>

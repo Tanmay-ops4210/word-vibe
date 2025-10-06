@@ -21,45 +21,6 @@ app.use((req, res, next) => {
   next();
 });
 
-let uploads = [];
-
-app.get('/api/uploads', (req, res) => {
-  try {
-    res.json(uploads);
-  } catch (error) {
-    console.error('Error fetching uploads:', error);
-    res.status(500).json({ error: 'Failed to fetch uploads' });
-  }
-});
-
-app.post('/api/uploads', (req, res) => {
-  try {
-    const { file_name, file_size, file_type } = req.body;
-
-    if (!file_name || !file_size) {
-      return res.status(400).json({ error: 'File name and size are required' });
-    }
-
-    const newUpload = {
-      id: Date.now().toString(),
-      file_name,
-      file_size,
-      file_type: file_type || 'unknown',
-      upload_date: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-    };
-
-    uploads.unshift(newUpload);
-
-    console.log('File uploaded:', newUpload);
-
-    res.status(201).json(newUpload);
-  } catch (error) {
-    console.error('Error uploading file:', error);
-    res.status(500).json({ error: 'Failed to upload file' });
-  }
-});
-
 app.post('/api/analyze-sentiment', async (req, res) => {
   try {
     const { text } = req.body;
