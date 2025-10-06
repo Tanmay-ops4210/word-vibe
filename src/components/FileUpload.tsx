@@ -1,255 +1,130 @@
-import { useState, useRef } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Upload, X, FileText, Image as ImageIcon, File } from "lucide-react";
-import { toast } from "sonner";
+import { useState } from 'react';
+import { Upload as UploadIcon, File, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 
-interface FileUploadProps {
-  onFileProcessed: (text: string, fileName: string) => void;
-}
+export default function FileUpload() {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
 
-const FileUpload = ({ onFileProcessed }: FileUploadProps) => {
-  const [isDragging, setIsDragging] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const acceptedFormats = {
-    'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp'],
-    'application/pdf': ['.pdf'],
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-    'application/msword': ['.doc'],
-    'text/plain': ['.txt']
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    
-    const file = e.dataTransfer.files[0];
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
-      handleFile(file);
+      setSelectedFile(file);
     }
   };
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleFile(file);
-    }
-  };
-
-  const isImageFile = (file: File) => {
-    return file.type.startsWith('image/');
-  };
-
-  const isPDFFile = (file: File) => {
-    return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-  };
-
-  const isDocFile = (file: File) => {
-    return file.type.includes('word') || 
-           file.name.toLowerCase().endsWith('.doc') || 
-           file.name.toLowerCase().endsWith('.docx');
-  };
-
-  const handleFile = async (file: File) => {
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      toast.error("File size must be less than 10MB");
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      toast({
+        title: 'No file selected',
+        description: 'Please select a file to upload',
+        variant: 'destructive',
+      });
       return;
     }
 
-    setUploadedFile(file);
-    
+    setUploading(true);
+
     try {
-      if (isImageFile(file)) {
-        await processImage(file);
-      } else if (isPDFFile(file) || isDocFile(file)) {
-        toast.info("Document parsing is processing...");
-        await processDocument(file);
-      } else {
-        // Plain text file
-        const text = await file.text();
-        onFileProcessed(text, file.name);
-        toast.success("Text file processed successfully!");
-      }
+      const { error } = await supabase.from('uploads').insert({
+        file_name: selectedFile.name,
+        file_size: selectedFile.size,
+        file_type: selectedFile.type,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Upload successful',
+        description: `${selectedFile.name} has been uploaded`,
+      });
+
+      setSelectedFile(null);
+      window.location.reload();
     } catch (error) {
-      console.error("Error processing file:", error);
-      toast.error("Failed to process file. Please try again.");
-      setUploadedFile(null);
+      toast({
+        title: 'Upload failed',
+        description: error instanceof Error ? error.message : 'An error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploading(false);
     }
   };
 
-  const processImage = async (file: File) => {
-    return new Promise<void>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const imageBase64 = e.target?.result as string;
-          
-          toast.info("Analyzing image with AI...");
-          
-          const response = await fetch(
-            '/api/analyze-image',
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ imageBase64 }),
-            }
-          );
-
-          if (!response.ok) {
-            throw new Error('Failed to analyze image');
-          }
-
-          const data = await response.json();
-          onFileProcessed(data.extractedText, file.name);
-          toast.success("Image analyzed successfully!");
-          resolve();
-        } catch (error) {
-          console.error("Error processing image:", error);
-          reject(error);
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const processDocument = async (file: File) => {
-    // For PDF and DOCX, we'll extract text in a simplified way
-    // In a production app, you'd use a proper document parsing library
-    const reader = new FileReader();
-    
-    reader.onload = async (e) => {
-      try {
-        const arrayBuffer = e.target?.result as ArrayBuffer;
-        
-        if (isPDFFile(file)) {
-          // For PDFs, we'll prompt the user to copy-paste the text for now
-          toast.info("Please copy the text from your PDF and paste it in the text area", {
-            duration: 5000
-          });
-          setUploadedFile(null);
-        } else if (isDocFile(file)) {
-          // For DOCX files, we'll prompt the user to copy-paste the text
-          toast.info("Please copy the text from your document and paste it in the text area", {
-            duration: 5000
-          });
-          setUploadedFile(null);
-        }
-      } catch (error) {
-        console.error("Error parsing document:", error);
-        toast.error("Could not parse document. Please copy and paste the text instead.");
-        setUploadedFile(null);
-      }
-    };
-    
-    reader.readAsArrayBuffer(file);
-  };
-
-  const clearFile = () => {
-    setUploadedFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const getFileIcon = () => {
-    if (!uploadedFile) return <Upload className="w-8 h-8" />;
-    
-    if (isImageFile(uploadedFile)) return <ImageIcon className="w-8 h-8" />;
-    if (isPDFFile(uploadedFile)) return <FileText className="w-8 h-8" />;
-    if (isDocFile(uploadedFile)) return <File className="w-8 h-8" />;
-    return <FileText className="w-8 h-8" />;
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
   };
 
   return (
-    <Card className="shadow-card border-border/50">
-      <CardContent className="p-6">
-        <div
-          className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all ${
-            isDragging
-              ? 'border-primary bg-primary/5'
-              : 'border-border hover:border-primary/50'
-          }`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            accept={Object.keys(acceptedFormats).join(',')}
-            onChange={handleFileInput}
-          />
-          
-          {uploadedFile ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-center">
-                <div className="text-primary">{getFileIcon()}</div>
-              </div>
-              <div className="space-y-2">
-                <p className="font-medium text-foreground">{uploadedFile.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {(uploadedFile.size / 1024).toFixed(2)} KB
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearFile}
-                className="gap-2"
-              >
-                <X className="w-4 h-4" />
-                Remove
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-center">
-                <Upload className="w-12 h-12 text-muted-foreground" />
-              </div>
-              <div className="space-y-2">
-                <p className="text-lg font-medium text-foreground">
-                  Drop your file here
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  or click to browse
-                </p>
-              </div>
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                variant="outline"
-                className="gap-2"
-              >
-                <Upload className="w-4 h-4" />
-                Choose File
-              </Button>
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>Supported formats:</p>
-                <p>Images (PNG, JPG, GIF, WebP)</p>
-                <p>Documents (PDF, DOC, DOCX, TXT)</p>
-                <p className="text-muted-foreground/70">Max size: 10MB</p>
-              </div>
-            </div>
-          )}
+    <Card className="p-6">
+      <div className="space-y-6">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">Upload File</h2>
+          <p className="text-muted-foreground">Select a file to upload to the database</p>
         </div>
-      </CardContent>
+
+        <div className="border-2 border-dashed border-border rounded-lg p-8">
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <div className="p-4 bg-primary/10 rounded-full">
+              <UploadIcon className="w-8 h-8 text-primary" />
+            </div>
+
+            <div className="text-center">
+              <label htmlFor="file-upload" className="cursor-pointer">
+                <span className="text-primary hover:text-primary/80 font-medium">
+                  Choose a file
+                </span>
+                <input
+                  id="file-upload"
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+              </label>
+              <p className="text-sm text-muted-foreground mt-1">
+                or drag and drop
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {selectedFile && (
+          <div className="flex items-center justify-between p-4 bg-secondary rounded-lg">
+            <div className="flex items-center space-x-3">
+              <File className="w-5 h-5 text-primary" />
+              <div>
+                <p className="font-medium">{selectedFile.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  {formatFileSize(selectedFile.size)}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedFile(null)}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+
+        <Button
+          onClick={handleUpload}
+          disabled={!selectedFile || uploading}
+          className="w-full"
+          size="lg"
+        >
+          {uploading ? 'Uploading...' : 'Upload File'}
+        </Button>
+      </div>
     </Card>
   );
-};
-
-export default FileUpload;
+}
